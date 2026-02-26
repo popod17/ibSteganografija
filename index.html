@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steganografija</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <div class="logo-placeholder"><p style="font-family: 'Brush Script MT', cursive; font-size: larger;">
+STEGANOGRAFIJA</p></div>
+        
+        <input class="fake-search-bar" type="text" placeholder="Search...">
+    </div>
+
+    <!-- Body Layout -->
+    <div class="body-layout">
+
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <button class="sidebar-btn active" onclick="loadGallery()">Gallery</button>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- ── GALLERY SECTION ── -->
+            <section class="content-section" id="section-gallery">
+                <div class="gallery-grid" id="gallery-grid"></div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- ── UPLOAD MODAL ── -->
+    <div class="modal-overlay" id="upload-overlay" hidden onclick="handleUploadOverlayClick(event)">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span class="modal-title">Encode &amp; Upload</span>
+                <button class="modal-close-btn" onclick="closeUploadModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="stego-intro" style="margin-bottom:4px;">
+                    Select a cover image, type your secret message, then click <strong>Encode &amp; Upload</strong>.
+                    The message is embedded via LSB steganography and the resulting PNG is uploaded to
+                    <code>localhost:8000</code>.
+                </p>
+                <label class="stego-label" for="upload-file-input">Cover image</label>
+                <input class="stego-file-input" type="file" id="upload-file-input" accept="image/*">
+                <div class="stego-hint" id="upload-capacity-hint">PNG recommended — JPEG re-compression will destroy the hidden data.</div>
+
+                <label class="stego-label" for="upload-message">Secret message</label>
+                <textarea class="stego-textarea" id="upload-message" rows="5" placeholder="Type your secret message here…"></textarea>
+
+                <button class="stego-action-btn" id="upload-btn" onclick="uploadImage()">&#128274;&#128228; Encode &amp; Upload</button>
+                <div class="status-msg status-info" id="upload-status"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAB: open upload modal -->
+    <button class="fab-btn" onclick="openUploadModal()" title="Encode &amp; Upload">+</button>
+
+    <!-- ── IMAGE VIEWER MODAL ── -->
+    <div class="modal-overlay" id="viewer-overlay" hidden onclick="handleViewerOverlayClick(event)">
+        <div class="modal-box viewer-modal-box">
+            <div class="modal-header">
+                <span class="modal-title" id="viewer-filename"></span>
+                <button class="modal-close-btn" onclick="closeViewer()">&times;</button>
+            </div>
+            <div class="modal-body viewer-modal-body">
+                <img class="viewer-img" id="viewer-img" src="" alt="">
+            <div class="viewer-message-wrap" id="viewer-message-wrap">
+                    <div class="stego-label">Hidden message:</div>
+                    <div class="viewer-message viewer-message--loading" id="viewer-message">Decoding&hellip;</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="steganography.js"></script>
+    <script>
+        // ── Navigation ────────────────────────────────────────────────────────
+        var API_BASE = 'http://localhost:8000';
+
+        // ── Upload modal ──────────────────────────────────────────────────────
+        function openUploadModal() {
+            document.getElementById('upload-overlay').hidden = false;
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeUploadModal() {
+            document.getElementById('upload-overlay').hidden = true;
+            document.body.style.overflow = '';
+        }
+
+        function handleUploadOverlayClick(e) {
+            if (e.target === document.getElementById('upload-overlay')) closeUploadModal();
+        }
+
+        // ── Upload (encode then send) ────────────────────────────────────────
+        var uploadSourceImage = null;
+
+        document.getElementById('upload-file-input').addEventListener('change', function(e) {
+            var file = e.target.files[0];
+            uploadSourceImage = null;
+            document.getElementById('upload-capacity-hint').textContent =
+                'PNG recommended — JPEG re-compression will destroy the hidden data.';
+            if (!file) return;
+            loadFileAsImage(file, function(img) {
+                if (!img) {
+                    setStatus('upload-status', 'Could not load the image.', 'error');
+                    return;
+                }
+                uploadSourceImage = img;
+                var capacity = steg.getHidingCapacity(img);
+                document.getElementById('upload-capacity-hint').textContent =
+                    'Image loaded (' + img.width + ' × ' + img.height + ' px). ' +
+                    'Max capacity: ~' + capacity + ' characters.';
+                setStatus('upload-status', '', 'info');
+            });
+        });
+
+        function uploadImage() {
+            var message = document.getElementById('upload-message').value;
+            var fileInput = document.getElementById('upload-file-input');
+            var btn = document.getElementById('upload-btn');
+
+            if (!uploadSourceImage) {
+                setStatus('upload-status', 'Please select a cover image first.', 'error');
+                return;
+            }
+            if (!message.trim()) {
+                setStatus('upload-status', 'Please enter a secret message to embed.', 'error');
+                return;
+            }
+            var capacity = steg.getHidingCapacity(uploadSourceImage);
+            if (message.length > capacity) {
+                setStatus('upload-status',
+                    'Message is too long (' + message.length + ' chars). Max for this image: ' + capacity + ' chars.',
+                    'error');
+                return;
+            }
+
+            btn.disabled = true;
+            setStatus('upload-status', 'Encoding…', 'info');
+
+            try {
+                // steg.encode returns a PNG data URL with the message embedded in the LSBs.
+                // We never touch the pixel data again after this point.
+                var dataURL = steg.encode(message, uploadSourceImage);
+
+                // Convert the data URL to a binary Blob so we can POST it.
+                var byteString = atob(dataURL.split(',')[1]);
+                var mimeType  = 'image/png';
+                var ab = new ArrayBuffer(byteString.length);
+                var ia = new Uint8Array(ab);
+                for (var i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+                var blob = new Blob([ab], { type: mimeType });
+
+                // Preserve the original base name but always use .png extension.
+                var origName = fileInput.files[0].name.replace(/\.[^.]+$/, '');
+                var uploadName = origName + '.png';
+
+                var formData = new FormData();
+                formData.append('file', blob, uploadName);
+
+                setStatus('upload-status', 'Uploading…', 'info');
+                fetch(API_BASE + '/upload', { method: 'POST', body: formData })
+                    .then(function(res) {
+                        if (!res.ok) return res.text().then(function(t) { throw new Error(t || 'HTTP ' + res.status); });
+                        return res.json();
+                    })
+                    .then(function() {
+                        setStatus('upload-status', 'Encoded and uploaded as “' + uploadName + '” successfully!', 'success');
+                        fileInput.value = '';
+                        document.getElementById('upload-message').value = '';
+                        document.getElementById('upload-capacity-hint').textContent =
+                            'PNG recommended — JPEG re-compression will destroy the hidden data.';
+                        uploadSourceImage = null;
+                        setTimeout(closeUploadModal, 1200);
+                    })
+                    .catch(function(err) {
+                        setStatus('upload-status', 'Upload failed: ' + err.message, 'error');
+                    })
+                    .finally(function() {
+                        btn.disabled = false;
+                    });
+            } catch (err) {
+                setStatus('upload-status', 'Encoding failed: ' + err.message, 'error');
+                btn.disabled = false;
+            }
+        }
+
+        // ── Viewer modal ──────────────────────────────────────────────────────
+        function openViewer(filename, showMessage) {
+            var overlay  = document.getElementById('viewer-overlay');
+            var imgEl    = document.getElementById('viewer-img');
+            var msgEl    = document.getElementById('viewer-message');
+            var msgWrap  = document.getElementById('viewer-message-wrap');
+            var titleEl  = document.getElementById('viewer-filename');
+
+            titleEl.textContent = filename;
+            imgEl.src           = '';
+            overlay.hidden      = false;
+            document.body.style.overflow = 'hidden';
+
+            // Show or hide the message section based on whether Ctrl was held
+            msgWrap.hidden    = !showMessage;
+            msgEl.textContent = 'Decoding…';
+            msgEl.className   = 'viewer-message viewer-message--loading';
+
+            var encoded = encodeURIComponent(filename);
+
+            // Fetch as a Blob so we can create a same-origin objectURL.
+            // Loading the image from a blob: URL means the canvas steg.decode()
+            // uses internally is never cross-origin tainted, avoiding the
+            // "The operation is insecure" SecurityError.
+            fetch(API_BASE + '/images/' + encoded)
+                .then(function(res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.blob();
+                })
+                .then(function(blob) {
+                    var objectURL = URL.createObjectURL(blob);
+                    var img = new Image();
+                    img.onload = function() {
+                        imgEl.src = objectURL;
+                        if (!showMessage) return; // skip decoding if Ctrl was not held
+                        try {
+                            var message = steg.decode(img);
+                            if (!message || message.trim() === '') {
+                                msgEl.textContent = '(no hidden message found)';
+                                msgEl.className   = 'viewer-message viewer-message--none';
+                            } else {
+                                msgEl.textContent = message;
+                                msgEl.className   = 'viewer-message';
+                            }
+                        } catch (err) {
+                            msgEl.textContent = 'Decode error: ' + err.message;
+                            msgEl.className   = 'viewer-message viewer-message--error';
+                        }
+                        // objectURL for display stays alive; revoke on next open or close
+                    };
+                    img.onerror = function() {
+                        URL.revokeObjectURL(objectURL);
+                        imgEl.src         = '';
+                        msgEl.textContent = 'Could not load image.';
+                        msgEl.className   = 'viewer-message viewer-message--error';
+                    };
+                    img.src = objectURL;
+                })
+                .catch(function(err) {
+                    imgEl.src         = '';
+                    msgEl.textContent = 'Failed to fetch image: ' + err.message;
+                    msgEl.className   = 'viewer-message viewer-message--error';
+                });
+        }
+
+        function closeViewer() {
+            document.getElementById('viewer-overlay').hidden = true;
+            document.body.style.overflow = '';
+        }
+
+        function handleViewerOverlayClick(e) {
+            if (e.target === document.getElementById('viewer-overlay')) closeViewer();
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeViewer();
+        });
+
+        // ── Gallery (auto-refresh every 5 s, smart diff to avoid flicker) ────
+        var _galleryFiles = [];
+
+        function loadGallery() {
+            fetch(API_BASE + '/files')
+                .then(function(res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.json();
+                })
+                .then(function(data) {
+                    var files = data.files || [];
+                    var grid  = document.getElementById('gallery-grid');
+
+                    // Remove cards for files no longer on the server
+                    _galleryFiles.forEach(function(name) {
+                        if (files.indexOf(name) === -1) {
+                            var old = document.getElementById('gcard-' + name);
+                            if (old) old.remove();
+                        }
+                    });
+
+                    // Add cards for newly appeared files
+                    files.forEach(function(filename) {
+                        if (_galleryFiles.indexOf(filename) !== -1) return;
+                        var encoded = encodeURIComponent(filename);
+                        var card = document.createElement('div');
+                        card.className = 'gallery-card';
+                        card.id = 'gcard-' + filename;
+
+                        var imgNode = document.createElement('img');
+                        imgNode.className = 'gallery-card-img';
+                        imgNode.src = API_BASE + '/images/' + encoded;
+                        imgNode.alt = filename;
+                        imgNode.onerror = function() { this.style.visibility = 'hidden'; };
+
+                        var nameNode = document.createElement('div');
+                        nameNode.className = 'gallery-card-name';
+                        nameNode.title = filename;
+                        nameNode.textContent = filename;
+
+                        card.appendChild(imgNode);
+                        card.appendChild(nameNode);
+                        card.addEventListener('click', function(e) {
+                            openViewer(filename, e.ctrlKey);
+                        });
+                        grid.appendChild(card);
+                    });
+
+                    _galleryFiles = files.slice();
+
+                    var empty = grid.querySelector('.gallery-empty');
+                    if (files.length === 0) {
+                        if (!empty) {
+                            var p = document.createElement('p');
+                            p.className = 'gallery-empty';
+                            p.textContent = 'No images on the server yet.';
+                            grid.appendChild(p);
+                        }
+                    } else if (empty) {
+                        empty.remove();
+                    }
+                })
+                .catch(function() { /* silently ignore poll errors */ });
+        }
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+        function setStatus(id, msg, type) {
+            var el = document.getElementById(id);
+            el.textContent = msg;
+            el.className = 'status-msg status-' + (type || 'info');
+        }
+
+        function loadFileAsImage(file, callback) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var img = new Image();
+                img.onload = function() { callback(img); };
+                img.onerror = function() { callback(null); };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        loadGallery();
+        setInterval(loadGallery, 5000);
+    </script>
+</body>
+</html>
