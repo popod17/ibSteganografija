@@ -85,6 +85,7 @@
     </div>
 
     <script src="steganography.js"></script>
+    <script src="dct-steganography.js"></script>
     <script>
         // ── Navigation ────────────────────────────────────────────────────────
         var API_BASE = 'http://localhost:8000';
@@ -106,12 +107,12 @@
 
         // ── Upload (encode then send) ────────────────────────────────────────
         var uploadSourceImage = null;
+        var uploadSourceFile = null;
 
         document.getElementById('upload-file-input').addEventListener('change', function(e) {
             var file = e.target.files[0];
             uploadSourceImage = null;
-            document.getElementById('upload-capacity-hint').textContent =
-                'PNG recommended — JPEG re-compression will destroy the hidden data.';
+            uploadSourceFile = null;
             if (!file) return;
             loadFileAsImage(file, function(img) {
                 if (!img) {
@@ -119,10 +120,25 @@
                     return;
                 }
                 uploadSourceImage = img;
-                var capacity = steg.getHidingCapacity(img);
-                document.getElementById('upload-capacity-hint').textContent =
-                    'Image loaded (' + img.width + ' × ' + img.height + ' px). ' +
-                    'Max capacity: ~' + capacity + ' characters.';
+                uploadSourceFile = file;
+                var isJpeg = file.type.includes('jpeg') || file.type.includes('jpg');
+                var format = isJpeg ? 'JPEG (DCT)' : 'PNG (LSB)';
+                if (isJpeg) {
+                    var dctCap = new DCTSteganography();
+                    dctCap.getCapacity(file).then(function(cap) {
+                        document.getElementById('upload-capacity-hint').textContent =
+                            'Format: ' + format + ' | Image: ' + img.width + ' × ' + img.height + ' px | ' +
+                            'Max capacity (DCT): ~' + cap + ' bytes.';
+                    }).catch(function() {
+                        document.getElementById('upload-capacity-hint').textContent =
+                            'Format: ' + format + ' | Image: ' + img.width + ' × ' + img.height + ' px';
+                    });
+                } else {
+                    var capacity = steg.getHidingCapacity(img);
+                    document.getElementById('upload-capacity-hint').textContent =
+                        'Format: ' + format + ' | Image: ' + img.width + ' × ' + img.height + ' px | ' +
+                        'Max capacity: ~' + capacity + ' characters.';
+                }
                 setStatus('upload-status', '', 'info');
             });
         });
@@ -132,7 +148,7 @@
             var fileInput = document.getElementById('upload-file-input');
             var btn = document.getElementById('upload-btn');
 
-            if (!uploadSourceImage) {
+            if (!uploadSourceImage || !uploadSourceFile) {
                 setStatus('upload-status', 'Please select a cover image first.', 'error');
                 return;
             }
@@ -140,64 +156,92 @@
                 setStatus('upload-status', 'Please enter a secret message to embed.', 'error');
                 return;
             }
-            var capacity = steg.getHidingCapacity(uploadSourceImage);
-            if (message.length > capacity) {
-                setStatus('upload-status',
-                    'Message is too long (' + message.length + ' chars). Max for this image: ' + capacity + ' chars.',
-                    'error');
-                return;
+            var isJpegFile = uploadSourceFile.type.includes('jpeg') || uploadSourceFile.type.includes('jpg');
+            if (!isJpegFile) {
+                var capacity = steg.getHidingCapacity(uploadSourceImage);
+                if (message.length > capacity) {
+                    setStatus('upload-status',
+                        'Message is too long (' + message.length + ' chars). Max for this image: ' + capacity + ' chars.',
+                        'error');
+                    return;
+                }
             }
 
             btn.disabled = true;
             setStatus('upload-status', 'Encoding…', 'info');
 
-            try {
-                // steg.encode returns a PNG data URL with the message embedded in the LSBs.
-                // We never touch the pixel data again after this point.
-                var dataURL = steg.encode(message, uploadSourceImage);
+            var isJpeg = uploadSourceFile.type.includes('jpeg') || uploadSourceFile.type.includes('jpg');
 
-                // Convert the data URL to a binary Blob so we can POST it.
-                var byteString = atob(dataURL.split(',')[1]);
-                var mimeType  = 'image/png';
-                var ab = new ArrayBuffer(byteString.length);
-                var ia = new Uint8Array(ab);
-                for (var i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-                var blob = new Blob([ab], { type: mimeType });
-
-                // Preserve the original base name but always use .png extension.
-                var origName = fileInput.files[0].name.replace(/\.[^.]+$/, '');
-                var uploadName = origName + '.png';
-
-                var formData = new FormData();
-                formData.append('file', blob, uploadName);
-
-                setStatus('upload-status', 'Uploading…', 'info');
-                fetch(API_BASE + '/upload', { method: 'POST', body: formData })
+            if (isJpeg) {
+                var dct = new DCTSteganography();
+                dct.embed(uploadSourceFile, message)
+                    .then(function(dataURL) {
+                        var byteString = atob(dataURL.split(',')[1]);
+                        var ab = new ArrayBuffer(byteString.length);
+                        var ia = new Uint8Array(ab);
+                        for (var i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+                        var blob = new Blob([ab], { type: 'image/jpeg' });
+                        var origName = fileInput.files[0].name.replace(/\.[^.]+$/, '');
+                        var uploadName = origName + '.jpg';
+                        var formData = new FormData();
+                        formData.append('file', blob, uploadName);
+                        setStatus('upload-status', 'Uploading…', 'info');
+                        return fetch(API_BASE + '/upload', { method: 'POST', body: formData });
+                    })
                     .then(function(res) {
                         if (!res.ok) return res.text().then(function(t) { throw new Error(t || 'HTTP ' + res.status); });
                         return res.json();
                     })
                     .then(function() {
-                        setStatus('upload-status', 'Encoded and uploaded as “' + uploadName + '” successfully!', 'success');
+                        setStatus('upload-status', 'Encoded and uploaded successfully!', 'success');
                         fileInput.value = '';
                         document.getElementById('upload-message').value = '';
-                        document.getElementById('upload-capacity-hint').textContent =
-                            'PNG recommended — JPEG re-compression will destroy the hidden data.';
                         uploadSourceImage = null;
+                        uploadSourceFile = null;
                         setTimeout(closeUploadModal, 1200);
                     })
                     .catch(function(err) {
-                        setStatus('upload-status', 'Upload failed: ' + err.message, 'error');
-                    })
-                    .finally(function() {
+                        setStatus('upload-status', 'Error: ' + err.message, 'error');
                         btn.disabled = false;
                     });
-            } catch (err) {
-                setStatus('upload-status', 'Encoding failed: ' + err.message, 'error');
-                btn.disabled = false;
+            } else {
+                try {
+                    var dataURL = steg.encode(message, uploadSourceImage);
+                    var byteString = atob(dataURL.split(',')[1]);
+                    var ab = new ArrayBuffer(byteString.length);
+                    var ia = new Uint8Array(ab);
+                    for (var i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+                    var blob = new Blob([ab], { type: 'image/png' });
+                    var origName = fileInput.files[0].name.replace(/\.[^.]+$/, '');
+                    var uploadName = origName + '.png';
+                    var formData = new FormData();
+                    formData.append('file', blob, uploadName);
+                    setStatus('upload-status', 'Uploading…', 'info');
+                    fetch(API_BASE + '/upload', { method: 'POST', body: formData })
+                        .then(function(res) {
+                            if (!res.ok) return res.text().then(function(t) { throw new Error(t || 'HTTP ' + res.status); });
+                            return res.json();
+                        })
+                        .then(function() {
+                            setStatus('upload-status', 'Encoded and uploaded successfully!', 'success');
+                            fileInput.value = '';
+                            document.getElementById('upload-message').value = '';
+                            uploadSourceImage = null;
+                            uploadSourceFile = null;
+                            setTimeout(closeUploadModal, 1200);
+                        })
+                        .catch(function(err) {
+                            setStatus('upload-status', 'Upload failed: ' + err.message, 'error');
+                        })
+                        .finally(function() {
+                            btn.disabled = false;
+                        });
+                } catch (err) {
+                    setStatus('upload-status', 'Encoding failed: ' + err.message, 'error');
+                    btn.disabled = false;
+                }
             }
         }
-
         // ── Viewer modal ──────────────────────────────────────────────────────
         function openViewer(filename, showMessage) {
             var overlay  = document.getElementById('viewer-overlay');
@@ -232,21 +276,37 @@
                     var img = new Image();
                     img.onload = function() {
                         imgEl.src = objectURL;
-                        if (!showMessage) return; // skip decoding if Ctrl was not held
-                        try {
-                            var message = steg.decode(img);
-                            if (!message || message.trim() === '') {
-                                msgEl.textContent = '(no hidden message found)';
-                                msgEl.className   = 'viewer-message viewer-message--none';
-                            } else {
-                                msgEl.textContent = message;
-                                msgEl.className   = 'viewer-message';
+                        if (!showMessage) return;
+                        var isJpeg = filename.toLowerCase().endsWith('.jpg') || filename.toLowerCase().endsWith('.jpeg');
+                        if (isJpeg) {
+                            var dctDec = new DCTSteganography();
+                            dctDec.extract(blob).then(function(message) {
+                                if (!message || message.trim() === '') {
+                                    msgEl.textContent = '(no hidden message found)';
+                                    msgEl.className   = 'viewer-message viewer-message--none';
+                                } else {
+                                    msgEl.textContent = message;
+                                    msgEl.className   = 'viewer-message';
+                                }
+                            }).catch(function(err) {
+                                msgEl.textContent = 'Decode error: ' + err.message;
+                                msgEl.className   = 'viewer-message viewer-message--error';
+                            });
+                        } else {
+                            try {
+                                var message = steg.decode(img);
+                                if (!message || message.trim() === '') {
+                                    msgEl.textContent = '(no hidden message found)';
+                                    msgEl.className   = 'viewer-message viewer-message--none';
+                                } else {
+                                    msgEl.textContent = message;
+                                    msgEl.className   = 'viewer-message';
+                                }
+                            } catch (err) {
+                                msgEl.textContent = 'Decode error: ' + err.message;
+                                msgEl.className   = 'viewer-message viewer-message--error';
                             }
-                        } catch (err) {
-                            msgEl.textContent = 'Decode error: ' + err.message;
-                            msgEl.className   = 'viewer-message viewer-message--error';
                         }
-                        // objectURL for display stays alive; revoke on next open or close
                     };
                     img.onerror = function() {
                         URL.revokeObjectURL(objectURL);
