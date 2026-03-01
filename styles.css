@@ -16,7 +16,7 @@ body {
     height: 100vh;
     display: flex;
     flex-direction: column;
-    background-color: #f0f0f0;
+    background-color: #494949;
 }
 
 /* Top Bar */
@@ -90,7 +90,7 @@ body {
 /* Left Sidebar */
 .sidebar {
     width: 200px;
-    background-color: #808080;
+    background-color: #1e1f20;
     display: flex;
     flex-direction: column;
     padding: 12px 10px;
@@ -110,7 +110,7 @@ body {
 }
 
 .sidebar-btn {
-    background-color: #6b6b6b;
+    background-color: #67a0bb;
     color: #f0f0f0;
     border: 1px solid #555;
     padding: 9px 12px;
@@ -126,7 +126,7 @@ body {
 }
 
 .sidebar-btn.active {
-    background-color: #4a4a4a;
+    background-color: #235c81;
     border-color: #333;
 }
 
@@ -135,7 +135,7 @@ body {
     flex: 1;
     padding: 20px;
     overflow-y: auto;
-    background-color: #e8e8e8;
+    background-color: #131314;
 }
 
 .section-title {
@@ -240,19 +240,20 @@ body {
     position: fixed;
     bottom: 28px;
     right: 28px;
-    width: 56px;
-    height: 56px;
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
     background-color: #4a4a4a;
     color: #fff;
     font-size: 32px;
-    line-height: 1;
     border: none;
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
     display: flex;
     align-items: center;
     justify-content: center;
+    padding-bottom: 5px;
+    padding-left: 1px;
     transition: background-color 0.15s, transform 0.15s, box-shadow 0.15s;
     z-index: 900;
     user-select: none;
