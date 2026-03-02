@@ -54,7 +54,7 @@
                 </p>
                 <label class="stego-label" for="upload-file-input">Cover image</label>
                 <input class="stego-file-input" type="file" id="upload-file-input" accept="image/*">
-                <div class="stego-hint" id="upload-capacity-hint">PNG recommended — JPEG re-compression will destroy the hidden data.</div>
+                <div class="stego-hint" id="upload-capacity-hint">Upload image here.</div>
 
                 <label class="stego-label" for="upload-message">Secret message</label>
                 <textarea class="stego-textarea" id="upload-message" rows="5" placeholder="Type your secret message here…"></textarea>
@@ -65,8 +65,28 @@
         </div>
     </div>
 
+    <!-- ── PLAIN UPLOAD MODAL ── -->
+    <div class="modal-overlay" id="plain-upload-overlay" hidden onclick="handlePlainUploadOverlayClick(event)">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span class="modal-title">Upload Image</span>
+                <button class="modal-close-btn" onclick="closePlainUploadModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="stego-intro" style="margin-bottom:4px;">
+                    Select an image to upload to <code>localhost:8000</code>.
+                </p>
+                <label class="stego-label" for="plain-upload-file-input">Image file</label>
+                <input class="stego-file-input" type="file" id="plain-upload-file-input" accept="image/*">
+
+                <button class="stego-action-btn" id="plain-upload-btn" onclick="plainUploadImage()">&#128228; Upload</button>
+                <div class="status-msg status-info" id="plain-upload-status"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- FAB: open upload modal -->
-    <button class="fab-btn" onclick="openUploadModal()" title="Encode &amp; Upload">+</button>
+    <button class="fab-btn" onclick="handleFabClick(event)">+</button>
 
     <!-- ── IMAGE VIEWER MODAL ── -->
     <div class="modal-overlay" id="viewer-overlay" hidden onclick="handleViewerOverlayClick(event)">
@@ -106,6 +126,64 @@
             if (e.target === document.getElementById('upload-overlay')) closeUploadModal();
         }
 
+        // ── Plain upload modal ────────────────────────────────────────────────
+        function openPlainUploadModal() {
+            document.getElementById('plain-upload-overlay').hidden = false;
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closePlainUploadModal() {
+            document.getElementById('plain-upload-overlay').hidden = true;
+            document.body.style.overflow = '';
+        }
+
+        function handlePlainUploadOverlayClick(e) {
+            if (e.target === document.getElementById('plain-upload-overlay')) closePlainUploadModal();
+        }
+
+        function plainUploadImage() {
+            var fileInput = document.getElementById('plain-upload-file-input');
+            var btn = document.getElementById('plain-upload-btn');
+            var file = fileInput.files[0];
+
+            if (!file) {
+                setStatus('plain-upload-status', 'Please select an image first.', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            setStatus('plain-upload-status', 'Uploading…', 'info');
+
+            var formData = new FormData();
+            formData.append('file', file, file.name);
+
+            fetch(API_BASE + '/upload', { method: 'POST', body: formData })
+                .then(function(res) {
+                    if (!res.ok) return res.text().then(function(t) { throw new Error(t || 'HTTP ' + res.status); });
+                    return res.json();
+                })
+                .then(function() {
+                    setStatus('plain-upload-status', 'Uploaded successfully!', 'success');
+                    fileInput.value = '';
+                    setTimeout(closePlainUploadModal, 1200);
+                })
+                .catch(function(err) {
+                    setStatus('plain-upload-status', 'Upload failed: ' + err.message, 'error');
+                })
+                .finally(function() {
+                    btn.disabled = false;
+                });
+        }
+
+        // ── FAB click handler ─────────────────────────────────────────────────
+        function handleFabClick(e) {
+            if (e.ctrlKey) {
+                openUploadModal();
+            } else {
+                openPlainUploadModal();
+            }
+        }
+
         // ── Upload (encode then send) ────────────────────────────────────────
         var uploadSourceImage = null;
         var uploadSourceFile = null;
@@ -115,6 +193,7 @@
             uploadSourceImage = null;
             uploadSourceFile = null;
             if (!file) return;
+
             loadFileAsImage(file, function(img) {
                 if (!img) {
                     setStatus('upload-status', 'Could not load the image.', 'error');
@@ -149,7 +228,7 @@
             var fileInput = document.getElementById('upload-file-input');
             var btn = document.getElementById('upload-btn');
 
-            if (!uploadSourceImage || !uploadSourceFile) {
+            if (!uploadSourceImage) {
                 setStatus('upload-status', 'Please select a cover image first.', 'error');
                 return;
             }
@@ -157,6 +236,7 @@
                 setStatus('upload-status', 'Please enter a secret message to embed.', 'error');
                 return;
             }
+
             var isJpegFile = uploadSourceFile.type.includes('jpeg') || uploadSourceFile.type.includes('jpg');
             if (!isJpegFile) {
                 var capacity = steg.getHidingCapacity(uploadSourceImage);
@@ -244,6 +324,16 @@
             }
         }
         // ── Viewer modal ──────────────────────────────────────────────────────
+        function showDecodedMessage(msgEl, message) {
+            if (!message || message.trim() === '') {
+                msgEl.textContent = '(no hidden message found)';
+                msgEl.className   = 'viewer-message viewer-message--none';
+            } else {
+                msgEl.textContent = message;
+                msgEl.className   = 'viewer-message';
+            }
+        }
+
         function openViewer(filename, showMessage) {
             var overlay  = document.getElementById('viewer-overlay');
             var imgEl    = document.getElementById('viewer-img');
@@ -256,17 +346,12 @@
             overlay.hidden      = false;
             document.body.style.overflow = 'hidden';
 
-            // Show or hide the message section based on whether Ctrl was held
             msgWrap.hidden    = !showMessage;
             msgEl.textContent = 'Decoding…';
             msgEl.className   = 'viewer-message viewer-message--loading';
 
             var encoded = encodeURIComponent(filename);
 
-            // Fetch as a Blob so we can create a same-origin objectURL.
-            // Loading the image from a blob: URL means the canvas steg.decode()
-            // uses internally is never cross-origin tainted, avoiding the
-            // "The operation is insecure" SecurityError.
             fetch(API_BASE + '/images/' + encoded)
                 .then(function(res) {
                     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -274,6 +359,7 @@
                 })
                 .then(function(blob) {
                     var objectURL = URL.createObjectURL(blob);
+
                     var img = new Image();
                     img.onload = function() {
                         imgEl.src = objectURL;
@@ -282,27 +368,14 @@
                         if (isJpeg) {
                             var dctDec = new DCTSteganography();
                             dctDec.extract(blob).then(function(message) {
-                                if (!message || message.trim() === '') {
-                                    msgEl.textContent = '(no hidden message found)';
-                                    msgEl.className   = 'viewer-message viewer-message--none';
-                                } else {
-                                    msgEl.textContent = message;
-                                    msgEl.className   = 'viewer-message';
-                                }
+                                showDecodedMessage(msgEl, message);
                             }).catch(function(err) {
                                 msgEl.textContent = 'Decode error: ' + err.message;
                                 msgEl.className   = 'viewer-message viewer-message--error';
                             });
                         } else {
                             try {
-                                var message = steg.decode(img);
-                                if (!message || message.trim() === '') {
-                                    msgEl.textContent = '(no hidden message found)';
-                                    msgEl.className   = 'viewer-message viewer-message--none';
-                                } else {
-                                    msgEl.textContent = message;
-                                    msgEl.className   = 'viewer-message';
-                                }
+                                showDecodedMessage(msgEl, steg.decode(img));
                             } catch (err) {
                                 msgEl.textContent = 'Decode error: ' + err.message;
                                 msgEl.className   = 'viewer-message viewer-message--error';
@@ -319,7 +392,7 @@
                 })
                 .catch(function(err) {
                     imgEl.src         = '';
-                    msgEl.textContent = 'Failed to fetch image: ' + err.message;
+                    msgEl.textContent = 'Failed to fetch file: ' + err.message;
                     msgEl.className   = 'viewer-message viewer-message--error';
                 });
         }
@@ -371,13 +444,13 @@
                         imgNode.src = API_BASE + '/images/' + encoded;
                         imgNode.alt = filename;
                         imgNode.onerror = function() { this.style.visibility = 'hidden'; };
+                        card.appendChild(imgNode);
 
                         var nameNode = document.createElement('div');
                         nameNode.className = 'gallery-card-name';
                         nameNode.title = filename;
                         nameNode.textContent = filename;
 
-                        card.appendChild(imgNode);
                         card.appendChild(nameNode);
                         card.addEventListener('click', function(e) {
                             openViewer(filename, e.ctrlKey);
