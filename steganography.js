@@ -95,11 +95,11 @@ Cover.prototype.getHidingCapacity = function(image, options) {
 };
 Cover.prototype.encode = function(message, image, options) {
   // Handle image url
-  if(image.length) {
+  if(image instanceof HTMLImageElement) {
+    // Already a loaded image element — use directly
+  } else if(typeof image === 'string') {
     image = util.loadImg(image);
-  } else if(image.src) {
-    image = util.loadImg(image.src);
-  } else if(!(image instanceof HTMLImageElement)) {
+  } else {
     throw new Error('IllegalInput: The input image is neither an URL string nor an image.');
   }
 
@@ -214,11 +214,11 @@ Cover.prototype.encode = function(message, image, options) {
 
 Cover.prototype.decode = function(image, options) {
   // Handle image url
-  if(image.length) {
+  if(image instanceof HTMLImageElement) {
+    // Already a loaded image element — use directly
+  } else if(typeof image === 'string') {
     image = util.loadImg(image);
-  } else if(image.src) {
-    image = util.loadImg(image.src);
-  } else if(!(image instanceof HTMLImageElement)) {
+  } else {
     throw new Error('IllegalInput: The input image is neither an URL string nor an image.');
   }
 
@@ -239,7 +239,7 @@ Cover.prototype.decode = function(image, options) {
 
   shadowCanvas.style.display = 'none';
   shadowCanvas.width = options.width || image.width;
-  shadowCanvas.height = options.width || image.height;
+  shadowCanvas.height = options.height || image.height;
   if(options.height && options.width) {
     shadowCtx.drawImage(image, 0, 0, options.width, options.height );
   } else {
