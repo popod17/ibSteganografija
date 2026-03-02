@@ -16,8 +16,7 @@ body {
     height: 100vh;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(135deg, #f5efe6 0%, #f0e6d3 35%, #e8dfd0 65%, #f2ece3 100%);
-    background-attachment: fixed;
+    background-color: #494949;
 }
 
 /* Top Bar */
@@ -94,7 +93,7 @@ body {
 /* Left Sidebar */
 .sidebar {
     width: 200px;
-    background: linear-gradient(180deg, #2c1810 0%, #3a2018 100%);
+    background-color: #1e1f20;
     display: flex;
     flex-direction: column;
     padding: 14px 10px;
@@ -114,10 +113,10 @@ body {
 }
 
 .sidebar-btn {
-    background: rgba(255, 255, 255, 0.06);
-    color: #d4c0ac;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 10px 14px;
+    background-color: #67a0bb;
+    color: #f0f0f0;
+    border: 1px solid #555;
+    padding: 9px 12px;
     text-align: left;
     font-size: 13px;
     border-radius: 8px;
@@ -132,9 +131,8 @@ body {
 }
 
 .sidebar-btn.active {
-    background: linear-gradient(135deg, rgba(217, 164, 90, 0.22), rgba(196, 108, 72, 0.18));
-    border-color: rgba(217, 164, 90, 0.45);
-    color: #fff;
+    background-color: #235c81;
+    border-color: #333;
 }
 
 /* Main Content */
@@ -142,7 +140,7 @@ body {
     flex: 1;
     padding: 24px;
     overflow-y: auto;
-    background-color: rgba(255, 255, 255, 0.35);
+    background-color: #131314;
 }
 
 .section-title {
@@ -253,21 +251,21 @@ body {
     position: fixed;
     bottom: 28px;
     right: 28px;
-    width: 58px;
-    height: 58px;
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
     background: linear-gradient(135deg, #c46c48, #d9a45a);
     color: #fff;
     font-size: 32px;
-    line-height: 1;
     border: none;
     cursor: pointer;
     box-shadow: 0 4px 18px rgba(196, 108, 72, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding-bottom: 3px;
-    transition: transform 0.2s, box-shadow 0.2s;
+    padding-bottom: 5px;
+    padding-left: 1px;
+    transition: background-color 0.15s, transform 0.15s, box-shadow 0.15s;
     z-index: 900;
     user-select: none;
     animation: fab-pulse 2s ease-in-out infinite;
