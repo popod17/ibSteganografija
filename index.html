@@ -120,6 +120,8 @@
     <script src="piexif.js"></script>
     <script src="steganography.js"></script>
     <script src="dct-steganography.js"></script>
+
+    
     <script>
         var API_BASE = 'http://localhost:8000';
 
@@ -522,7 +524,10 @@
             reader.onload = function(e) {
                 var img = new Image();
                 img.onload = function() { callback(img); };
-                img.onerror = function() { callback(null); };
+                img.onerror = function() {
+                    console.error('loadFileAsImage: failed to load image from file:', file.name);
+                    callback(null);
+                };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
