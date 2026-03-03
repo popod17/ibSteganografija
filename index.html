@@ -56,6 +56,18 @@
                 <input class="stego-file-input" type="file" id="upload-file-input" accept="image/*">
                 <div class="stego-hint" id="upload-capacity-hint">Upload image here.</div>
 
+                <div id="jpeg-method-selector" style="display:none; margin: 8px 0 4px;">
+                    <label class="stego-label" style="margin-bottom:4px;">Encoding method (JPEG only)</label>
+                    <div style="display:flex; gap:20px; align-items:center; margin-top:4px;">
+                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+                            <input type="radio" name="jpeg-method" value="dct" checked> DCT coefficients
+                        </label>
+                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+                            <input type="radio" name="jpeg-method" value="exif"> EXIF metadata
+                        </label>
+                    </div>
+                </div>
+
                 <label class="stego-label" for="upload-message">Secret message</label>
                 <textarea class="stego-textarea" style="resize: none;" id="upload-message" rows="5" placeholder="Type your secret message here…"></textarea>
 
@@ -105,13 +117,12 @@
         </div>
     </div>
 
+    <script src="piexif.js"></script>
     <script src="steganography.js"></script>
     <script src="dct-steganography.js"></script>
     <script>
-        // ── Navigation ────────────────────────────────────────────────────────
         var API_BASE = 'http://localhost:8000';
 
-        // ── Upload modal ──────────────────────────────────────────────────────
         function openUploadModal() {
             document.getElementById('upload-overlay').hidden = false;
             document.body.style.overflow = 'hidden';
@@ -126,7 +137,6 @@
             if (e.target === document.getElementById('upload-overlay')) closeUploadModal();
         }
 
-        // ── Plain upload modal ────────────────────────────────────────────────
         function openPlainUploadModal() {
             document.getElementById('plain-upload-overlay').hidden = false;
             document.body.style.overflow = 'hidden';
@@ -175,7 +185,6 @@
                 });
         }
 
-        // ── FAB click handler ─────────────────────────────────────────────────
         function handleFabClick(e) {
             if (e.ctrlKey) {
                 openUploadModal();
@@ -184,7 +193,6 @@
             }
         }
 
-        // ── Upload (encode then send) ────────────────────────────────────────
         var uploadSourceImage = null;
         var uploadSourceFile = null;
 
@@ -192,6 +200,7 @@
             var file = e.target.files[0];
             uploadSourceImage = null;
             uploadSourceFile = null;
+            document.getElementById('jpeg-method-selector').style.display = 'none';
             if (!file) return;
 
             loadFileAsImage(file, function(img) {
@@ -202,26 +211,53 @@
                 uploadSourceImage = img;
                 uploadSourceFile = file;
                 var isJpeg = file.type.includes('jpeg') || file.type.includes('jpg');
-                var format = isJpeg ? 'JPEG (DCT)' : 'PNG (LSB)';
                 if (isJpeg) {
-                    var dctCap = new DCTSteganography();
-                    dctCap.getCapacity(file).then(function(cap) {
-                        document.getElementById('upload-capacity-hint').textContent =
-                            'Format: ' + format + ' | Image: ' + img.width + ' × ' + img.height + ' px | ' +
-                            'Max capacity (DCT): ~' + cap + ' bytes.';
-                    }).catch(function() {
-                        document.getElementById('upload-capacity-hint').textContent =
-                            'Format: ' + format + ' | Image: ' + img.width + ' × ' + img.height + ' px';
-                    });
-                } else {
-                    var capacity = steg.getHidingCapacity(img);
+                    document.getElementById('jpeg-method-selector').style.display = 'block';
                     document.getElementById('upload-capacity-hint').textContent =
-                        'Format: ' + format + ' | Image: ' + img.width + ' × ' + img.height + ' px | ' +
-                        'Max capacity: ~' + capacity + ' characters.';
+                        'Format: JPEG | Image: ' + img.width + ' × ' + img.height + ' px';
+                } else {
+                    document.getElementById('jpeg-method-selector').style.display = 'none';
+                    document.getElementById('upload-capacity-hint').textContent =
+                        'Format: PNG (LSB) | Image: ' + img.width + ' × ' + img.height + ' px';
                 }
                 setStatus('upload-status', '', 'info');
             });
         });
+
+        function embedExif(file, message) {
+            return new Promise(function(resolve, reject) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        var dataURL = e.target.result;
+                        var exifObj;
+                        try { exifObj = piexif.load(dataURL); }
+                        catch (ex) { exifObj = { '0th': {}, 'Exif': {}, 'GPS': {}, '1st': {} }; }
+                        exifObj['0th'][piexif.ImageIFD.ImageDescription] = message;
+                        var exifbytes = piexif.dump(exifObj);
+                        var inserted = piexif.insert(exifbytes, dataURL);
+                        resolve(inserted);
+                    } catch (err) { reject(err); }
+                };
+                reader.onerror = function() { reject(new Error('Failed to read file')); };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function extractExif(blob) {
+            return new Promise(function(resolve, reject) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        var exifObj = piexif.load(e.target.result);
+                        var msg = (exifObj['0th'] && exifObj['0th'][piexif.ImageIFD.ImageDescription]) || '';
+                        resolve(msg);
+                    } catch (err) { resolve(''); }
+                };
+                reader.onerror = function() { reject(new Error('Failed to read file')); };
+                reader.readAsDataURL(blob);
+            });
+        }
 
         function uploadImage() {
             var message = document.getElementById('upload-message').value;
@@ -237,25 +273,20 @@
                 return;
             }
 
-            var isJpegFile = uploadSourceFile.type.includes('jpeg') || uploadSourceFile.type.includes('jpg');
-            if (!isJpegFile) {
-                var capacity = steg.getHidingCapacity(uploadSourceImage);
-                if (message.length > capacity) {
-                    setStatus('upload-status',
-                        'Message is too long (' + message.length + ' chars). Max for this image: ' + capacity + ' chars.',
-                        'error');
-                    return;
-                }
-            }
-
             btn.disabled = true;
             setStatus('upload-status', 'Encoding…', 'info');
 
             var isJpeg = uploadSourceFile.type.includes('jpeg') || uploadSourceFile.type.includes('jpg');
 
             if (isJpeg) {
-                var dct = new DCTSteganography();
-                dct.embed(uploadSourceFile, message)
+                var sel = document.querySelector('input[name="jpeg-method"]:checked');
+                var jpegMethod = sel ? sel.value : 'dct';
+
+                var encodePromise = (jpegMethod === 'exif')
+                    ? embedExif(uploadSourceFile, message)
+                    : new DCTSteganography().embed(uploadSourceFile, message);
+
+                encodePromise
                     .then(function(dataURL) {
                         var byteString = atob(dataURL.split(',')[1]);
                         var ab = new ArrayBuffer(byteString.length);
@@ -323,7 +354,6 @@
                 }
             }
         }
-        // ── Viewer modal ──────────────────────────────────────────────────────
         function showDecodedMessage(msgEl, message) {
             if (!message || message.trim() === '') {
                 msgEl.textContent = '(no hidden message found)';
@@ -366,12 +396,21 @@
                         if (!showMessage) return;
                         var isJpeg = filename.toLowerCase().endsWith('.jpg') || filename.toLowerCase().endsWith('.jpeg');
                         if (isJpeg) {
-                            var dctDec = new DCTSteganography();
-                            dctDec.extract(blob).then(function(message) {
-                                showDecodedMessage(msgEl, message);
-                            }).catch(function(err) {
-                                msgEl.textContent = 'Decode error: ' + err.message;
-                                msgEl.className   = 'viewer-message viewer-message--error';
+                            extractExif(blob).then(function(exifMsg) {
+                                if (exifMsg && exifMsg.trim()) {
+                                    showDecodedMessage(msgEl, exifMsg);
+                                } else {
+                                    return new DCTSteganography().extract(blob).then(function(dctMsg) {
+                                        showDecodedMessage(msgEl, dctMsg);
+                                    });
+                                }
+                            }).catch(function() {
+                                new DCTSteganography().extract(blob).then(function(dctMsg) {
+                                    showDecodedMessage(msgEl, dctMsg);
+                                }).catch(function(err) {
+                                    msgEl.textContent = 'Decode error: ' + err.message;
+                                    msgEl.className   = 'viewer-message viewer-message--error';
+                                });
                             });
                         } else {
                             try {
@@ -410,7 +449,6 @@
             if (e.key === 'Escape') closeViewer();
         });
 
-        // ── Gallery (auto-refresh every 5 s, smart diff to avoid flicker) ────
         var _galleryFiles = [];
 
         function loadGallery() {
@@ -423,7 +461,6 @@
                     var files = data.files || [];
                     var grid  = document.getElementById('gallery-grid');
 
-                    // Remove cards for files no longer on the server
                     _galleryFiles.forEach(function(name) {
                         if (files.indexOf(name) === -1) {
                             var old = document.getElementById('gcard-' + name);
@@ -431,7 +468,6 @@
                         }
                     });
 
-                    // Add cards for newly appeared files
                     files.forEach(function(filename) {
                         if (_galleryFiles.indexOf(filename) !== -1) return;
                         var encoded = encodeURIComponent(filename);
@@ -472,10 +508,9 @@
                         empty.remove();
                     }
                 })
-                .catch(function() { /* silently ignore poll errors */ });
+                .catch(function() {});
         }
 
-        // ── Helpers ───────────────────────────────────────────────────────────
         function setStatus(id, msg, type) {
             var el = document.getElementById(id);
             el.textContent = msg;
