@@ -484,3 +484,44 @@ body {
     box-shadow: none;
     transform: none;
 }
+
+/* ── Integrity verification badge ────────────────────────────────────────── */
+
+.viewer-integrity-wrap {
+    margin-top: 2px;
+}
+
+.viewer-integrity {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 8px;
+    text-align: center;
+    letter-spacing: 0.3px;
+}
+
+.viewer-integrity--loading {
+    color: #a08b78;
+    background: rgba(160, 139, 120, 0.08);
+    border: 1px solid rgba(160, 139, 120, 0.2);
+    font-style: italic;
+    font-weight: 400;
+}
+
+.viewer-integrity--verified {
+    color: #1a7a2e;
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.viewer-integrity--tampered {
+    color: #c0392b;
+    background: rgba(231, 76, 60, 0.1);
+    border: 1px solid rgba(231, 76, 60, 0.25);
+}
+
+.viewer-integrity--no-signature {
+    color: #b8860b;
+    background: rgba(184, 134, 11, 0.08);
+    border: 1px solid rgba(184, 134, 11, 0.2);
+}

@@ -109,6 +109,9 @@
             </div>
             <div class="modal-body viewer-modal-body">
                 <img class="viewer-img" id="viewer-img" src="" alt="">
+            <div class="viewer-integrity-wrap" id="viewer-integrity-wrap">
+                    <div class="viewer-integrity viewer-integrity--loading" id="viewer-integrity">Verifying&hellip;</div>
+                </div>
             <div class="viewer-message-wrap" id="viewer-message-wrap">
                     <div class="stego-label">Hidden message:</div>
                     <div class="viewer-message viewer-message--loading" id="viewer-message">Decoding&hellip;</div>
@@ -120,10 +123,10 @@
     <script src="piexif.js"></script>
     <script src="steganography.js"></script>
     <script src="dct-steganography.js"></script>
-
-    
+    <script src="integrity.js" integrity="sha384-sGghN6DWFNQzZSjbsZscm+Ou/uyqVDcrTQpFQOnc8J28rNPsi370oeX88z5AKRyn" crossorigin="anonymous"></script>
     <script>
-        var API_BASE = 'http://localhost:8000';
+        // ── Navigation ────────────────────────────────────────────────────────
+        var API_BASE = 'http://localhost:8001';
 
         function openUploadModal() {
             document.getElementById('upload-overlay').hidden = false;
@@ -384,12 +387,26 @@
 
             var encoded = encodeURIComponent(filename);
 
+            var integrityEl = document.getElementById('viewer-integrity');
+            integrityEl.textContent = 'Verifying\u2026';
+            integrityEl.className = 'viewer-integrity viewer-integrity--loading';
+
             fetch(API_BASE + '/images/' + encoded)
                 .then(function(res) {
                     if (!res.ok) throw new Error('HTTP ' + res.status);
                     return res.blob();
                 })
                 .then(function(blob) {
+                    blob.arrayBuffer().then(function(ab) {
+                        return ImageIntegrity.verify(ab);
+                    }).then(function(result) {
+                        integrityEl.textContent = result.message;
+                        integrityEl.className = 'viewer-integrity viewer-integrity--' + result.status;
+                    }).catch(function() {
+                        integrityEl.textContent = 'No Signature Found \u26A0';
+                        integrityEl.className = 'viewer-integrity viewer-integrity--no-signature';
+                    });
+
                     var objectURL = URL.createObjectURL(blob);
 
                     var img = new Image();
