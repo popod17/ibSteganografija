@@ -21,8 +21,8 @@ body {
 
 /* Top Bar */
 .top-bar {
-    display: flex;
-    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
     align-items: center;
     background: linear-gradient(90deg, #2c1810 0%, #3d1f17 50%, #4a2520 100%);
     height: 60px;
@@ -45,12 +45,13 @@ body {
     flex-shrink: 0;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.08);
+    justify-self: start;
 }
 
 .search-wrapper {
     display: flex;
     align-items: center;
-    margin-left: 25vw;
+    justify-content: center;
     gap: 6px;
 }
 
@@ -83,6 +84,11 @@ body {
     color: #a08b78;
 }
 
+.profile-pic {
+    justify-self: end;
+    margin-right: 0;
+}
+
 /* Body Layout */
 .body-layout {
     display: flex;
@@ -93,7 +99,7 @@ body {
 /* Left Sidebar */
 .sidebar {
     width: 200px;
-    background-color: #1e1f20;
+    background-color: #3e2927;
     display: flex;
     flex-direction: column;
     padding: 14px 10px;
@@ -131,7 +137,7 @@ body {
 }
 
 .sidebar-btn.active {
-    background-color: #235c81;
+    background-color: #7d6c3f;
     border-color: #333;
 }
 

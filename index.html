@@ -13,10 +13,10 @@
         <div class="logo-placeholder"><p style="font-family: 'Product Sans', cursive; font-size: 23px;">
 <b>Stego </b> <span style="color: rgb(121, 121, 121);">Photos</span></div>
         <div class="search-wrapper">
-            <p style="margin-left: 50px; border: 3px solid rgb(92, 92, 92); padding: 5px 12px; border-radius: 40px; background-color: rgb(92, 92, 92);">&#8981;</p>
+            <p style="margin-left: 50px; border: 1px solid rgb(92, 92, 92); padding: 8px 12px; border-radius: 40px; background-color: rgb(77, 28, 28);">&#8981;</p>
             <input class="fake-search-bar" type="text" placeholder="Search...">
-            <p style="margin-left: 50px; border: 3px solid rgb(92, 92, 92); padding: 5px 6px; border-radius: 40px; background-color: rgb(168, 168, 168);">👤</p>
         </div>
+        <p style="border: 3px solid rgb(92, 92, 92); padding: 5px 6px; border-radius: 40px; background-color: rgb(168, 168, 168);" class="profile-pic">👤</p>
         
     </div>
 
@@ -57,9 +57,9 @@
                 <div class="stego-hint" id="upload-capacity-hint">Upload image here.</div>
 
                 <label class="stego-label" for="upload-message">Secret message</label>
-                <textarea class="stego-textarea" id="upload-message" rows="5" placeholder="Type your secret message here…"></textarea>
+                <textarea class="stego-textarea" style="resize: none;" id="upload-message" rows="5" placeholder="Type your secret message here…"></textarea>
 
-                <button class="stego-action-btn" id="upload-btn" onclick="uploadImage()">&#128274;&#128228; Encode &amp; Upload</button>
+                <button class="stego-action-btn" id="upload-btn" onclick="uploadImage()">Encode &amp; Upload</button>
                 <div class="status-msg status-info" id="upload-status"></div>
             </div>
         </div>
