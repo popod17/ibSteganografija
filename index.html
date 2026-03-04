@@ -1,23 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Steganografija</title>
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
 
     <!-- Top Bar -->
     <div class="top-bar">
-        <div class="logo-placeholder"><p style="font-family: 'Product Sans', cursive; font-size: 23px;">
-<b>Stego </b> <span style="color: rgb(121, 121, 121);">Photos</span></div>
+        <div class="logo-placeholder">
+            <p style="font-family: 'Product Sans', cursive; font-size: 23px;">
+                <b>Stego </b> <span style="color: rgb(121, 121, 121);">Photos</span>
+        </div>
         <div class="search-wrapper">
-            <p style="margin-left: 50px; border: 1px solid rgb(92, 92, 92); padding: 8px 12px; border-radius: 40px; background-color: rgb(77, 28, 28);">&#8981;</p>
+            <img src="slikicki/search.svg" alt="search-icon" style="width: 26px; background-color: #f8caca; border-radius: 50%; padding: 5px;">
             <input class="fake-search-bar" type="text" placeholder="Search...">
         </div>
-        <p style="border: 3px solid rgb(92, 92, 92); padding: 5px 6px; border-radius: 40px; background-color: rgb(168, 168, 168);" class="profile-pic">👤</p>
-        
+        <img src="slikicki/account.svg" alt="account-image" class="profile-pic">
+
     </div>
 
     <!-- Body Layout -->
@@ -25,7 +29,9 @@
 
         <!-- Sidebar -->
         <nav class="sidebar">
-            <button class="sidebar-btn active" onclick="loadGallery()">Gallery</button>
+            <button class="sidebar-btn active" onclick="loadGallery()">Галерија</button>
+            <button class="sidebar-btn">Settings</button>
+            <button class="sidebar-btn">About</button>
         </nav>
 
         <!-- Main Content -->
@@ -43,27 +49,24 @@
     <div class="modal-overlay" id="upload-overlay" hidden onclick="handleUploadOverlayClick(event)">
         <div class="modal-box">
             <div class="modal-header">
-                <span class="modal-title">Encode &amp; Upload</span>
+                <span class="modal-title">Прикачи слика со тајна</span>
                 <button class="modal-close-btn" onclick="closeUploadModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <p class="stego-intro" style="margin-bottom:4px;">
-                    Select a cover image, type your secret message, then click <strong>Encode &amp; Upload</strong>.
-                    The message is embedded via LSB steganography and the resulting PNG is uploaded to
-                    <code>localhost:8000</code>.
+                    Избери слика и внеси тајна порака. За png слики можно е енкодирање со LSB, а за JPEG можно е користење на DCT или во метадата на сликата.
                 </p>
-                <label class="stego-label" for="upload-file-input">Cover image</label>
+                <label class="stego-label" for="upload-file-input">Избери слика</label>
                 <input class="stego-file-input" type="file" id="upload-file-input" accept="image/*">
-                <div class="stego-hint" id="upload-capacity-hint">Upload image here.</div>
 
                 <div id="jpeg-method-selector" style="display:none; margin: 8px 0 4px;">
-                    <label class="stego-label" style="margin-bottom:4px;">Encoding method (JPEG only)</label>
+                    <label class="stego-label" style="margin-bottom:4px;">Метод за енкодирање</label>
                     <div style="display:flex; gap:20px; align-items:center; margin-top:4px;">
                         <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
-                            <input type="radio" name="jpeg-method" value="dct" checked> DCT coefficients
+                            <input type="radio" name="jpeg-method" value="dct" checked> DCT
                         </label>
                         <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
-                            <input type="radio" name="jpeg-method" value="exif"> EXIF metadata
+                            <input type="radio" name="jpeg-method" value="exif"> EXIF метадата
                         </label>
                     </div>
                 </div>
@@ -71,15 +74,16 @@
                 <div id="robust-mode-selector" style="margin: 8px 0 4px;">
                     <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px;">
                         <input type="checkbox" id="robust-mode-checkbox">
-                        <span><strong>Robust mode</strong> — compression-resistant (lower capacity, ~59 bytes for 1920×1080)</span>
+                        <span><strong>Robust mode</strong> — против компресија (помал капацитет) </span>
                     </label>
                     <div class="stego-hint" id="robust-capacity-hint" style="display:none; margin-top:4px;"></div>
                 </div>
 
-                <label class="stego-label" for="upload-message">Secret message</label>
-                <textarea class="stego-textarea" style="resize: none;" id="upload-message" rows="5" placeholder="Type your secret message here…"></textarea>
+                <label class="stego-label" for="upload-message">Тајна порака</label>
+                <textarea class="stego-textarea" style="resize: none;" id="upload-message" rows="5"
+                    placeholder="Внеси тајна порака."></textarea>
 
-                <button class="stego-action-btn" id="upload-btn" onclick="uploadImage()">Encode &amp; Upload</button>
+                <button class="stego-action-btn" id="upload-btn" onclick="uploadImage()">Енкодирај и прикачи</button>
                 <div class="status-msg status-info" id="upload-status"></div>
             </div>
         </div>
@@ -89,17 +93,16 @@
     <div class="modal-overlay" id="plain-upload-overlay" hidden onclick="handlePlainUploadOverlayClick(event)">
         <div class="modal-box">
             <div class="modal-header">
-                <span class="modal-title">Upload Image</span>
+                <span class="modal-title">Прикачи слика</span>
                 <button class="modal-close-btn" onclick="closePlainUploadModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <p class="stego-intro" style="margin-bottom:4px;">
-                    Select an image to upload to <code>localhost:8000</code>.
+                    Избери слика за прикачување
                 </p>
-                <label class="stego-label" for="plain-upload-file-input">Image file</label>
-                <input class="stego-file-input" type="file" id="plain-upload-file-input" accept="image/*">
+                <input class="stego-file-input" type="file" id="plain-upload-file-input" accept=".jpg, .jpeg, .png, image/jpeg, image/png">
 
-                <button class="stego-action-btn" id="plain-upload-btn" onclick="plainUploadImage()">&#128228; Upload</button>
+                <button class="stego-action-btn" id="plain-upload-btn" onclick="plainUploadImage()">Прикачи</button>
                 <div class="status-msg status-info" id="plain-upload-status"></div>
             </div>
         </div>
@@ -117,12 +120,13 @@
             </div>
             <div class="modal-body viewer-modal-body">
                 <img class="viewer-img" id="viewer-img" src="" alt="">
-            <div class="viewer-integrity-wrap" id="viewer-integrity-wrap">
-                    <div class="viewer-integrity viewer-integrity--loading" id="viewer-integrity">Verifying&hellip;</div>
+                <div class="viewer-integrity-wrap" id="viewer-integrity-wrap">
+                    <div class="viewer-integrity viewer-integrity--loading" id="viewer-integrity">Верификација...;
+                    </div>
                 </div>
-            <div class="viewer-message-wrap" id="viewer-message-wrap">
-                    <div class="stego-label">Hidden message:</div>
-                    <div class="viewer-message viewer-message--loading" id="viewer-message">Decoding&hellip;</div>
+                <div class="viewer-message-wrap" id="viewer-message-wrap">
+                    <div class="stego-label">Скриена порака:</div>
+                    <div class="viewer-message viewer-message--loading" id="viewer-message">Декодирање...</div>
                 </div>
             </div>
         </div>
@@ -132,7 +136,7 @@
     <script src="steganography.js"></script>
     <script src="dct-steganography.js"></script>
     <script src="robust-steganography.js"></script>
-    <script src="integrity.js" integrity="sha384-sGghN6DWFNQzZSjbsZscm+Ou/uyqVDcrTQpFQOnc8J28rNPsi370oeX88z5AKRyn" crossorigin="anonymous"></script>
+    <script src="integrity.js" integrity="sha384-7N45bHuptDtDGr3XWuPkUXbZMORmwPn5ZKLHFJC6uPaHbp3sa1xelI00EsrRA2Sc" crossorigin="anonymous"></script>
     <script>
         // ── Navigation ────────────────────────────────────────────────────────
         var API_BASE = 'http://localhost:8001';
@@ -171,30 +175,30 @@
             var file = fileInput.files[0];
 
             if (!file) {
-                setStatus('plain-upload-status', 'Please select an image first.', 'error');
+                setStatus('plain-upload-status', 'Изберете слика.', 'error');
                 return;
             }
 
             btn.disabled = true;
-            setStatus('plain-upload-status', 'Uploading…', 'info');
+            setStatus('plain-upload-status', 'Прикачување...', 'info');
 
             var formData = new FormData();
             formData.append('file', file, file.name);
 
             fetch(API_BASE + '/upload', { method: 'POST', body: formData })
-                .then(function(res) {
-                    if (!res.ok) return res.text().then(function(t) { throw new Error(t || 'HTTP ' + res.status); });
+                .then(function (res) {
+                    if (!res.ok) return res.text().then(function (t) { throw new Error(t || 'HTTP ' + res.status); });
                     return res.json();
                 })
-                .then(function() {
-                    setStatus('plain-upload-status', 'Uploaded successfully!', 'success');
+                .then(function () {
+                    setStatus('plain-upload-status', 'Успешно прикачено!', 'success');
                     fileInput.value = '';
                     setTimeout(closePlainUploadModal, 1200);
                 })
-                .catch(function(err) {
-                    setStatus('plain-upload-status', 'Upload failed: ' + err.message, 'error');
+                .catch(function (err) {
+                    setStatus('plain-upload-status', 'Неуспешно прикачување: ' + err.message, 'error');
                 })
-                .finally(function() {
+                .finally(function () {
                     btn.disabled = false;
                 });
         }
@@ -211,27 +215,27 @@
         var uploadSourceFile = null;
         var _robustSteg = new RobustSteganography({ spreadFactor: 64, strength: 15 });
 
-        document.getElementById('robust-mode-checkbox').addEventListener('change', function() {
+        document.getElementById('robust-mode-checkbox').addEventListener('change', function () {
             var hint = document.getElementById('robust-capacity-hint');
             if (this.checked && uploadSourceImage) {
                 var cap = _robustSteg.getCapacity(uploadSourceImage.width, uploadSourceImage.height);
-                hint.textContent = 'Robust capacity: ' + cap + ' bytes (~' + cap + ' ASCII chars)';
+                hint.textContent = 'Капацитет: ' + cap + ' бајти (~' + cap + ' карактери)';
                 hint.style.display = 'block';
             } else {
                 hint.style.display = 'none';
             }
         });
 
-        document.getElementById('upload-file-input').addEventListener('change', function(e) {
+        document.getElementById('upload-file-input').addEventListener('change', function (e) {
             var file = e.target.files[0];
             uploadSourceImage = null;
             uploadSourceFile = null;
             document.getElementById('jpeg-method-selector').style.display = 'none';
             if (!file) return;
 
-            loadFileAsImage(file, function(img) {
+            loadFileAsImage(file, function (img) {
                 if (!img) {
-                    setStatus('upload-status', 'Could not load the image.', 'error');
+                    setStatus('upload-status', 'Грешка при вчитување на сликата', 'error');
                     return;
                 }
                 uploadSourceImage = img;
@@ -251,7 +255,7 @@
                 var robustHint = document.getElementById('robust-capacity-hint');
                 if (robustCb.checked) {
                     var rCap = _robustSteg.getCapacity(img.width, img.height);
-                    robustHint.textContent = 'Robust capacity: ' + rCap + ' bytes (~' + rCap + ' ASCII chars)';
+                    robustHint.textContent = 'Капацитет: ' + rCap + ' бајти (~' + rCap + ' карактери)';
                     robustHint.style.display = 'block';
                 } else {
                     robustHint.style.display = 'none';
@@ -261,9 +265,9 @@
         });
 
         function embedExif(file, message) {
-            return new Promise(function(resolve, reject) {
+            return new Promise(function (resolve, reject) {
                 var reader = new FileReader();
-                reader.onload = function(e) {
+                reader.onload = function (e) {
                     try {
                         var dataURL = e.target.result;
                         var exifObj;
@@ -275,22 +279,22 @@
                         resolve(inserted);
                     } catch (err) { reject(err); }
                 };
-                reader.onerror = function() { reject(new Error('Failed to read file')); };
+                reader.onerror = function () { reject(new Error('Failed to read file')); };
                 reader.readAsDataURL(file);
             });
         }
 
         function extractExif(blob) {
-            return new Promise(function(resolve, reject) {
+            return new Promise(function (resolve, reject) {
                 var reader = new FileReader();
-                reader.onload = function(e) {
+                reader.onload = function (e) {
                     try {
                         var exifObj = piexif.load(e.target.result);
                         var msg = (exifObj['0th'] && exifObj['0th'][piexif.ImageIFD.ImageDescription]) || '';
                         resolve(msg);
                     } catch (err) { resolve(''); }
                 };
-                reader.onerror = function() { reject(new Error('Failed to read file')); };
+                reader.onerror = function () { reject(new Error('Failed to read file')); };
                 reader.readAsDataURL(blob);
             });
         }
@@ -301,16 +305,16 @@
             var btn = document.getElementById('upload-btn');
 
             if (!uploadSourceImage) {
-                setStatus('upload-status', 'Please select a cover image first.', 'error');
+                setStatus('upload-status', 'Изберете слика.', 'error');
                 return;
             }
             if (!message.trim()) {
-                setStatus('upload-status', 'Please enter a secret message to embed.', 'error');
+                setStatus('upload-status', 'Внесете тајна порака.', 'error');
                 return;
             }
 
             btn.disabled = true;
-            setStatus('upload-status', 'Encoding…', 'info');
+            setStatus('upload-status', 'Енкодирање...', 'info');
 
             var isJpeg = uploadSourceFile.type.includes('jpeg') || uploadSourceFile.type.includes('jpg');
             var useRobust = document.getElementById('robust-mode-checkbox').checked;
@@ -318,16 +322,16 @@
             if (useRobust) {
                 // ── Robust spread-spectrum path (PNG or JPEG) ──
                 var outMime = isJpeg ? 'image/jpeg' : 'image/png';
-                var outExt  = isJpeg ? '.jpg' : '.png';
+                var outExt = isJpeg ? '.jpg' : '.png';
                 var rCap = _robustSteg.getCapacity(uploadSourceImage.width, uploadSourceImage.height);
                 var msgLen = new TextEncoder().encode(message).length;
                 if (msgLen > rCap) {
-                    setStatus('upload-status', 'Message too long for robust mode (' + msgLen + ' bytes). Max: ' + rCap + ' bytes.', 'error');
+                    setStatus('upload-status', 'Предолга порака за robust mode (' + msgLen + ' bytes). Макс.: ' + rCap + ' бајти.', 'error');
                     btn.disabled = false;
                     return;
                 }
                 _robustSteg.embed(uploadSourceImage, message, outMime, 0.92)
-                    .then(function(dataURL) {
+                    .then(function (dataURL) {
                         var byteString = atob(dataURL.split(',')[1]);
                         var ab = new ArrayBuffer(byteString.length);
                         var ia = new Uint8Array(ab);
@@ -337,25 +341,25 @@
                         var uploadName = origName + '_robust' + outExt;
                         var formData = new FormData();
                         formData.append('file', blob, uploadName);
-                        setStatus('upload-status', 'Uploading…', 'info');
+                        setStatus('upload-status', 'Прикачување...', 'info');
                         return fetch(API_BASE + '/upload', { method: 'POST', body: formData });
                     })
-                    .then(function(res) {
-                        if (!res.ok) return res.text().then(function(t) { throw new Error(t || 'HTTP ' + res.status); });
+                    .then(function (res) {
+                        if (!res.ok) return res.text().then(function (t) { throw new Error(t || 'HTTP ' + res.status); });
                         return res.json();
                     })
-                    .then(function() {
-                        setStatus('upload-status', 'Encoded (robust) and uploaded successfully!', 'success');
+                    .then(function () {
+                        setStatus('upload-status', 'Успешно прикачено! (robust)', 'success');
                         fileInput.value = '';
                         document.getElementById('upload-message').value = '';
                         uploadSourceImage = null;
                         uploadSourceFile = null;
                         setTimeout(closeUploadModal, 1200);
                     })
-                    .catch(function(err) {
-                        setStatus('upload-status', 'Error: ' + err.message, 'error');
+                    .catch(function (err) {
+                        setStatus('upload-status', 'Грешка: ' + err.message, 'error');
                     })
-                    .finally(function() {
+                    .finally(function () {
                         btn.disabled = false;
                     });
                 return;
@@ -370,7 +374,7 @@
                     : new DCTSteganography().embed(uploadSourceFile, message);
 
                 encodePromise
-                    .then(function(dataURL) {
+                    .then(function (dataURL) {
                         var byteString = atob(dataURL.split(',')[1]);
                         var ab = new ArrayBuffer(byteString.length);
                         var ia = new Uint8Array(ab);
@@ -380,23 +384,23 @@
                         var uploadName = origName + '.jpg';
                         var formData = new FormData();
                         formData.append('file', blob, uploadName);
-                        setStatus('upload-status', 'Uploading…', 'info');
+                        setStatus('upload-status', 'Прикачување...', 'info');
                         return fetch(API_BASE + '/upload', { method: 'POST', body: formData });
                     })
-                    .then(function(res) {
-                        if (!res.ok) return res.text().then(function(t) { throw new Error(t || 'HTTP ' + res.status); });
+                    .then(function (res) {
+                        if (!res.ok) return res.text().then(function (t) { throw new Error(t || 'HTTP ' + res.status); });
                         return res.json();
                     })
-                    .then(function() {
-                        setStatus('upload-status', 'Encoded and uploaded successfully!', 'success');
+                    .then(function () {
+                        setStatus('upload-status', 'Успешно прикачено!', 'success');
                         fileInput.value = '';
                         document.getElementById('upload-message').value = '';
                         uploadSourceImage = null;
                         uploadSourceFile = null;
                         setTimeout(closeUploadModal, 1200);
                     })
-                    .catch(function(err) {
-                        setStatus('upload-status', 'Error: ' + err.message, 'error');
+                    .catch(function (err) {
+                        setStatus('upload-status', 'Грешка: ' + err.message, 'error');
                         btn.disabled = false;
                     });
             } else {
@@ -411,161 +415,170 @@
                     var uploadName = origName + '.png';
                     var formData = new FormData();
                     formData.append('file', blob, uploadName);
-                    setStatus('upload-status', 'Uploading…', 'info');
+                    setStatus('upload-status', 'Прикачување...', 'info');
                     fetch(API_BASE + '/upload', { method: 'POST', body: formData })
-                        .then(function(res) {
-                            if (!res.ok) return res.text().then(function(t) { throw new Error(t || 'HTTP ' + res.status); });
+                        .then(function (res) {
+                            if (!res.ok) return res.text().then(function (t) { throw new Error(t || 'HTTP ' + res.status); });
                             return res.json();
                         })
-                        .then(function() {
-                            setStatus('upload-status', 'Encoded and uploaded successfully!', 'success');
+                        .then(function () {
+                            setStatus('upload-status', 'Успешно прикачено!', 'success');
                             fileInput.value = '';
                             document.getElementById('upload-message').value = '';
                             uploadSourceImage = null;
                             uploadSourceFile = null;
                             setTimeout(closeUploadModal, 1200);
                         })
-                        .catch(function(err) {
-                            setStatus('upload-status', 'Upload failed: ' + err.message, 'error');
+                        .catch(function (err) {
+                            setStatus('upload-status', 'Грешка при прикачување: ' + err.message, 'error');
                         })
-                        .finally(function() {
+                        .finally(function () {
                             btn.disabled = false;
                         });
                 } catch (err) {
-                    setStatus('upload-status', 'Encoding failed: ' + err.message, 'error');
+                    setStatus('upload-status', 'Грешка при енкодирање: ' + err.message, 'error');
                     btn.disabled = false;
                 }
             }
         }
         function showDecodedMessage(msgEl, message) {
             if (!message || message.trim() === '') {
-                msgEl.textContent = '(no hidden message found)';
-                msgEl.className   = 'viewer-message viewer-message--none';
+                msgEl.textContent = '(нема скриена порака)';
+                msgEl.className = 'viewer-message viewer-message--none';
             } else {
                 msgEl.textContent = message;
-                msgEl.className   = 'viewer-message';
+                msgEl.className = 'viewer-message';
             }
         }
 
         function openViewer(filename, showMessage) {
-            var overlay  = document.getElementById('viewer-overlay');
-            var imgEl    = document.getElementById('viewer-img');
-            var msgEl    = document.getElementById('viewer-message');
-            var msgWrap  = document.getElementById('viewer-message-wrap');
-            var titleEl  = document.getElementById('viewer-filename');
+            var overlay = document.getElementById('viewer-overlay');
+            var imgEl = document.getElementById('viewer-img');
+            var msgEl = document.getElementById('viewer-message');
+            var msgWrap = document.getElementById('viewer-message-wrap');
+            var titleEl = document.getElementById('viewer-filename');
 
             titleEl.textContent = filename;
-            imgEl.src           = '';
-            overlay.hidden      = false;
+            imgEl.src = '';
+            overlay.hidden = false;
             document.body.style.overflow = 'hidden';
 
-            msgWrap.hidden    = !showMessage;
-            msgEl.textContent = 'Decoding…';
-            msgEl.className   = 'viewer-message viewer-message--loading';
+            msgWrap.hidden = !showMessage;
+            msgEl.textContent = 'Декодирање...';
+            msgEl.className = 'viewer-message viewer-message--loading';
 
             var encoded = encodeURIComponent(filename);
 
             var integrityEl = document.getElementById('viewer-integrity');
-            integrityEl.textContent = 'Verifying\u2026';
-            integrityEl.className = 'viewer-integrity viewer-integrity--loading';
+            var integrityWrap = document.getElementById('viewer-integrity-wrap');
+
+            if (!showMessage) {
+                integrityWrap.hidden = true;
+            } else {
+                integrityWrap.hidden = false;
+                integrityEl.textContent = 'Верификација...';
+                integrityEl.className = 'viewer-integrity viewer-integrity--loading';
+            }
 
             fetch(API_BASE + '/images/' + encoded)
-                .then(function(res) {
+                .then(function (res) {
                     if (!res.ok) throw new Error('HTTP ' + res.status);
                     return res.blob();
                 })
-                .then(function(blob) {
-                    blob.arrayBuffer().then(function(ab) {
-                        return ImageIntegrity.verify(ab);
-                    }).then(function(result) {
-                        integrityEl.textContent = result.message;
-                        integrityEl.className = 'viewer-integrity viewer-integrity--' + result.status;
-                    }).catch(function() {
-                        integrityEl.textContent = 'No Signature Found \u26A0';
-                        integrityEl.className = 'viewer-integrity viewer-integrity--no-signature';
-                    });
+                .then(function (blob) {
+                    if (showMessage) {
+                        blob.arrayBuffer().then(function (ab) {
+                            return ImageIntegrity.verify(ab);
+                        }).then(function (result) {
+                            integrityEl.textContent = result.message;
+                            integrityEl.className = 'viewer-integrity viewer-integrity--' + result.status;
+                        }).catch(function () {
+                            integrityEl.textContent = 'No Signature Found';
+                            integrityEl.className = 'viewer-integrity viewer-integrity--no-signature';
+                        });
+                    }
 
                     var objectURL = URL.createObjectURL(blob);
 
                     var img = new Image();
-                    img.onload = function() {
+                    img.onload = function () {
                         imgEl.src = objectURL;
                         if (!showMessage) return;
                         var isJpeg = filename.toLowerCase().endsWith('.jpg') || filename.toLowerCase().endsWith('.jpeg');
                         // Try robust extraction first, then fall back to
                         // the original method for the format.
-                        _robustSteg.extract(img).then(function(robustMsg) {
+                        _robustSteg.extract(img).then(function (robustMsg) {
                             if (robustMsg && robustMsg.trim()) {
                                 showDecodedMessage(msgEl, robustMsg);
                                 return;
                             }
                             // Robust found nothing — try original methods
                             if (isJpeg) {
-                                extractExif(blob).then(function(exifMsg) {
+                                extractExif(blob).then(function (exifMsg) {
                                     if (exifMsg && exifMsg.trim()) {
                                         showDecodedMessage(msgEl, exifMsg);
                                     } else {
-                                        return new DCTSteganography().extract(blob).then(function(dctMsg) {
+                                        return new DCTSteganography().extract(blob).then(function (dctMsg) {
                                             showDecodedMessage(msgEl, dctMsg);
                                         });
                                     }
-                                }).catch(function() {
-                                    new DCTSteganography().extract(blob).then(function(dctMsg) {
+                                }).catch(function () {
+                                    new DCTSteganography().extract(blob).then(function (dctMsg) {
                                         showDecodedMessage(msgEl, dctMsg);
-                                    }).catch(function(err) {
-                                        msgEl.textContent = 'Decode error: ' + err.message;
-                                        msgEl.className   = 'viewer-message viewer-message--error';
+                                    }).catch(function (err) {
+                                        msgEl.textContent = 'Грешка при декодирање: ' + err.message;
+                                        msgEl.className = 'viewer-message viewer-message--error';
                                     });
                                 });
                             } else {
                                 try {
                                     showDecodedMessage(msgEl, steg.decode(img));
                                 } catch (err) {
-                                    msgEl.textContent = 'Decode error: ' + err.message;
-                                    msgEl.className   = 'viewer-message viewer-message--error';
+                                    msgEl.textContent = 'Грешка при декодирање: ' + err.message;
+                                    msgEl.className = 'viewer-message viewer-message--error';
                                 }
                             }
-                        }).catch(function() {
+                        }).catch(function () {
                             // Robust extraction failed — try originals
                             if (isJpeg) {
-                                extractExif(blob).then(function(exifMsg) {
+                                extractExif(blob).then(function (exifMsg) {
                                     if (exifMsg && exifMsg.trim()) {
                                         showDecodedMessage(msgEl, exifMsg);
                                     } else {
-                                        return new DCTSteganography().extract(blob).then(function(dctMsg) {
+                                        return new DCTSteganography().extract(blob).then(function (dctMsg) {
                                             showDecodedMessage(msgEl, dctMsg);
                                         });
                                     }
-                                }).catch(function() {
-                                    new DCTSteganography().extract(blob).then(function(dctMsg) {
+                                }).catch(function () {
+                                    new DCTSteganography().extract(blob).then(function (dctMsg) {
                                         showDecodedMessage(msgEl, dctMsg);
-                                    }).catch(function(err) {
-                                        msgEl.textContent = 'Decode error: ' + err.message;
-                                        msgEl.className   = 'viewer-message viewer-message--error';
+                                    }).catch(function (err) {
+                                        msgEl.textContent = 'Грешка при декодирање: ' + err.message;
+                                        msgEl.className = 'viewer-message viewer-message--error';
                                     });
                                 });
                             } else {
                                 try {
                                     showDecodedMessage(msgEl, steg.decode(img));
                                 } catch (err) {
-                                    msgEl.textContent = 'Decode error: ' + err.message;
-                                    msgEl.className   = 'viewer-message viewer-message--error';
+                                    msgEl.textContent = 'Грешка при декодирање: ' + err.message;
+                                    msgEl.className = 'viewer-message viewer-message--error';
                                 }
                             }
                         });
                     };
-                    img.onerror = function() {
+                    img.onerror = function () {
                         URL.revokeObjectURL(objectURL);
-                        imgEl.src         = '';
-                        msgEl.textContent = 'Could not load image.';
-                        msgEl.className   = 'viewer-message viewer-message--error';
+                        imgEl.src = '';
+                        msgEl.textContent = 'Грешка при вчитување на сликата';
+                        msgEl.className = 'viewer-message viewer-message--error';
                     };
                     img.src = objectURL;
                 })
-                .catch(function(err) {
-                    imgEl.src         = '';
+                .catch(function (err) {
+                    imgEl.src = '';
                     msgEl.textContent = 'Failed to fetch file: ' + err.message;
-                    msgEl.className   = 'viewer-message viewer-message--error';
+                    msgEl.className = 'viewer-message viewer-message--error';
                 });
         }
 
@@ -578,7 +591,7 @@
             if (e.target === document.getElementById('viewer-overlay')) closeViewer();
         }
 
-        document.addEventListener('keydown', function(e) {
+        document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') closeViewer();
         });
 
@@ -586,22 +599,22 @@
 
         function loadGallery() {
             fetch(API_BASE + '/files')
-                .then(function(res) {
+                .then(function (res) {
                     if (!res.ok) throw new Error('HTTP ' + res.status);
                     return res.json();
                 })
-                .then(function(data) {
+                .then(function (data) {
                     var files = data.files || [];
-                    var grid  = document.getElementById('gallery-grid');
+                    var grid = document.getElementById('gallery-grid');
 
-                    _galleryFiles.forEach(function(name) {
+                    _galleryFiles.forEach(function (name) {
                         if (files.indexOf(name) === -1) {
                             var old = document.getElementById('gcard-' + name);
                             if (old) old.remove();
                         }
                     });
 
-                    files.forEach(function(filename) {
+                    files.forEach(function (filename) {
                         if (_galleryFiles.indexOf(filename) !== -1) return;
                         var encoded = encodeURIComponent(filename);
                         var card = document.createElement('div');
@@ -612,7 +625,7 @@
                         imgNode.className = 'gallery-card-img';
                         imgNode.src = API_BASE + '/images/' + encoded;
                         imgNode.alt = filename;
-                        imgNode.onerror = function() { this.style.visibility = 'hidden'; };
+                        imgNode.onerror = function () { this.style.visibility = 'hidden'; };
                         card.appendChild(imgNode);
 
                         var nameNode = document.createElement('div');
@@ -621,7 +634,7 @@
                         nameNode.textContent = filename;
 
                         card.appendChild(nameNode);
-                        card.addEventListener('click', function(e) {
+                        card.addEventListener('click', function (e) {
                             openViewer(filename, e.ctrlKey);
                         });
                         grid.appendChild(card);
@@ -634,14 +647,14 @@
                         if (!empty) {
                             var p = document.createElement('p');
                             p.className = 'gallery-empty';
-                            p.textContent = 'No images on the server yet.';
+                            p.textContent = 'Нема слики';
                             grid.appendChild(p);
                         }
                     } else if (empty) {
                         empty.remove();
                     }
                 })
-                .catch(function() {});
+                .catch(function () { });
         }
 
         function setStatus(id, msg, type) {
@@ -652,10 +665,10 @@
 
         function loadFileAsImage(file, callback) {
             var reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 var img = new Image();
-                img.onload = function() { callback(img); };
-                img.onerror = function() {
+                img.onload = function () { callback(img); };
+                img.onerror = function () {
                     console.error('loadFileAsImage: failed to load image from file:', file.name);
                     callback(null);
                 };
@@ -665,7 +678,8 @@
         }
 
         loadGallery();
-        setInterval(loadGallery, 5000);
+        setInterval(loadGallery, 3000);
     </script>
 </body>
+
 </html>

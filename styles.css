@@ -87,6 +87,10 @@ body {
 .profile-pic {
     justify-self: end;
     margin-right: 0;
+    width: 40px;
+    background-color: #f8caca;
+    border-radius: 50%;
+    cursor: pointer;
 }
 
 /* Body Layout */
@@ -119,7 +123,7 @@ body {
 }
 
 .sidebar-btn {
-    background-color: #67a0bb;
+    background-color: #533a32;
     color: #f0f0f0;
     border: 1px solid #555;
     padding: 9px 12px;
@@ -137,8 +141,12 @@ body {
 }
 
 .sidebar-btn.active {
-    background-color: #7d6c3f;
+    background-color: #f8caca;
     border-color: #333;
+    color: #ffffff;
+    text-shadow: -1px 0 black, 0 1px black, 1px 0 black, 0 -1px black; 
+    font-size: x-large;
+    font-weight: 900;
 }
 
 /* Main Content */

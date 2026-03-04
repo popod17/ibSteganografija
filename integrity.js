@@ -1,4 +1,4 @@
-var SIGNING_PUBLIC_KEY_B64 = 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEz1riGtUldED13GOCktL8OHHg3GhpDDkQCYRwOwwJBb90JCHJ0ogovqS4Vh3GzoBErR70o/DVOTZtTKRaQBLMFw==';
+var SIGNING_PUBLIC_KEY_B64 = 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE350ssta6J205I/DUezi1EgNZxjfJ94jcNzVt8oS2am7Ec5bLRrEgLJtfIhFe7SHpf/wOca+2zQDw2isAzFPe7g==';
 
 var ImageIntegrity = (function() {
   var _publicKey = null;
@@ -190,7 +190,7 @@ var ImageIntegrity = (function() {
         verifyData
       ).then(function(valid) {
         if (valid) {
-          var msg = 'Image Integrity Verified \u2705';
+          var msg = 'Image Integrity Verified |';
           if (timestamp) {
             var d = new Date(timestamp);
             if (!isNaN(d.getTime())) {
@@ -199,10 +199,10 @@ var ImageIntegrity = (function() {
           }
           return { status: 'verified', message: msg, timestamp: timestamp };
         }
-        return { status: 'tampered', message: 'Image Tampered \u274C' };
+        return { status: 'tampered', message: 'Image Tampered' };
       });
     }).catch(function() {
-      return { status: 'tampered', message: 'Image Tampered \u274C' };
+      return { status: 'tampered', message: 'Image Tampered' };
     });
   }
 
