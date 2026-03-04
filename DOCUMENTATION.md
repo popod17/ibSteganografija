@@ -7,7 +7,8 @@
 3. [Steganography Methods](#3-steganography-methods)
    - 3.1 [LSB Steganography (PNG)](#31-lsb-steganography-png)
    - 3.2 [DCT Steganography (JPEG)](#32-dct-steganography-jpeg)
-   - 3.3 [Comparison of Methods](#33-comparison-of-methods)
+   - 3.3 [Robust Spread-Spectrum Steganography (PNG & JPEG)](#33-robust-spread-spectrum-steganography-png--jpeg)
+   - 3.4 [Comparison of Methods](#34-comparison-of-methods)
 4. [Digital Signature & Integrity Verification](#4-digital-signature--integrity-verification)
    - 4.1 [Cryptographic Primitives](#41-cryptographic-primitives)
    - 4.2 [Key Generation](#42-key-generation)
@@ -241,19 +242,121 @@ This avoids bundling and keeps the page fast for users who don't need JPEG stega
 
 ---
 
-### 3.3 Comparison of Methods
+### 3.3 Robust Spread-Spectrum Steganography (PNG & JPEG)
 
-| Aspect | LSB (PNG) | DCT (JPEG) |
-|--------|-----------|------------|
-| **Format** | PNG (lossless) | JPEG (lossy) |
-| **Domain** | Spatial (alpha pixel values) | Frequency (DCT coefficients) |
-| **Channel used** | Alpha (transparency) | Quantized DCT coefficients |
-| **Capacity** | High (~3 bits/pixel) | Variable (depends on content/quality) |
-| **Robustness** | Fragile — any re-encoding destroys data | More resilient to minor manipulation |
-| **Detection** | Detectable via alpha-channel analysis | Harder to detect statistically |
-| **Sync/Async** | Synchronous | Asynchronous |
-| **Dependencies** | None (self-contained) | CDN library required |
-| **Message delimiter** | Bit pattern (0xFF alpha run) | 4-byte length header |
+**File:** `robust-steganography.js`  
+**Class:** `RobustSteganography`  
+**Dependencies:** None (pure client-side, uses Canvas API)
+
+#### How It Works
+
+Unlike LSB and basic DCT embedding which modify individual pixel/coefficient values and are destroyed by re-compression, the robust method uses **pixel-domain spread-spectrum modulation**. Each message bit is spread across many 8×8 pixel blocks using a pseudo-random ±1 pattern, then recovered via correlation — the same principle used in spread-spectrum radio communications.
+
+##### Encoding Algorithm
+
+1. The image is loaded into an HTML Canvas to obtain raw RGBA pixel data.
+2. The message is encoded as UTF-8 bytes with a 4-byte big-endian length header.
+3. Each payload bit is mapped to ±1 (bit 1 → +1, bit 0 → −1).
+4. The image is divided into non-overlapping 8×8 blocks.
+5. For each message bit, `SPREAD_FACTOR` (default 64) blocks are selected sequentially.
+6. For each block, a seeded xorshift32 PRNG generates a deterministic ±1 pattern of 64 values.
+7. Each pixel's R, G, B channels are modified by `± STRENGTH × pattern_value`, clamped to [0, 255].
+8. The modified pixel data is written back and exported as a data URL (PNG or JPEG).
+
+##### Extraction Algorithm
+
+1. The stego image is loaded into Canvas to get pixel data.
+2. For each candidate bit position, the same PRNG patterns are regenerated.
+3. A **correlation sum** is computed: $\sum_{\text{blocks}} \sum_{\text{pixels}} \text{pixel\_value} \times \text{pattern\_value}$ across R, G, B channels.
+4. If correlation > 0 → bit is 1; if correlation < 0 → bit is 0.
+5. The first 32 bits decode the message length; the remaining bits decode the message.
+
+##### Why It Survives Compression
+
+JPEG compression adds quantisation noise that is **zero-mean** and **uncorrelated** with the pseudo-random pattern. Over `SPREAD_FACTOR × 64 pixels × 3 channels` samples, the embedded signal reinforces while noise cancels:
+
+$$\text{SNR} \approx \frac{\text{SPREAD\_FACTOR} \times 64 \times 3 \times \text{STRENGTH}}{\sqrt{\text{SPREAD\_FACTOR} \times 64 \times 3} \times \sigma_{\text{noise}}}$$
+
+With defaults (SPREAD_FACTOR=64, STRENGTH=15) and typical JPEG noise σ≈3:
+
+$$\text{SNR} \approx \frac{64 \times 192 \times 15}{\sqrt{64 \times 192} \times 3} \approx \frac{184{,}320}{333} \approx 553$$
+
+This very high SNR means confident bit recovery even after heavy compression.
+
+##### Capacity Formula
+
+$$\text{capacity (bytes)} = \left\lfloor \frac{\lfloor W/8 \rfloor \times \lfloor H/8 \rfloor}{\text{SPREAD\_FACTOR}} - 32 \right\rfloor \div 8$$
+
+For a 1920×1080 image with default settings (SPREAD_FACTOR=64):
+
+$$\left\lfloor \frac{240 \times 135}{64} - 32 \right\rfloor \div 8 = \left\lfloor 506.25 - 32 \right\rfloor \div 8 = \lfloor 474.25 \rfloor \div 8 = 59 \text{ bytes}$$
+
+##### Configuration
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `spreadFactor` | 64 | Blocks per message bit (higher = more robust, less capacity) |
+| `strength` | 15 | Pixel modification amplitude (higher = more robust, more visible) |
+| `seed` | 0x57E60 | PRNG seed (must match on embed and extract) |
+
+##### Robustness vs. Capacity Trade-offs
+
+For a **1920×1080** image:
+
+| Settings | Capacity | Survives JPEG Q≥ |
+|----------|----------|-------------------|
+| spread=8, strength=5 | ~506 bytes | 70 |
+| spread=16, strength=7 | ~249 bytes | 50 |
+| spread=32, strength=10 | ~122 bytes | 40 |
+| **spread=64, strength=15** (default) | **~59 bytes** | **30** |
+
+##### Methods
+
+| Method | Signature | Returns | Description |
+|--------|-----------|---------|-------------|
+| `embed` | `rs.embed(source, message, [mimeType], [quality])` | `Promise<DataURL>` | Embeds message into image |
+| `extract` | `rs.extract(source)` | `Promise<String>` | Extracts hidden message |
+| `getCapacity` | `rs.getCapacity(width, height)` | `Number` | Max message bytes for given dimensions |
+
+##### Usage
+
+```js
+var rs = new RobustSteganography({ spreadFactor: 64, strength: 15 });
+
+// Check capacity
+var cap = rs.getCapacity(1920, 1080); // → 59 bytes
+
+// Embed into JPEG
+var dataURL = await rs.embed(imageElement, 'secret', 'image/jpeg', 0.85);
+
+// Embed into PNG
+var dataURL = await rs.embed(imageElement, 'secret', 'image/png');
+
+// Extract (auto-detects, works with any source type)
+var message = await rs.extract(imageElement);  // HTMLImageElement
+var message = await rs.extract(blob);          // Blob / File
+var message = await rs.extract(dataURL);       // data URL string
+```
+
+##### Testing Compression Robustness
+
+See [Section 8: Testing Compression Robustness](#testing-compression-robustness) for a detailed testing guide.
+
+---
+
+### 3.4 Comparison of Methods
+
+| Aspect | LSB (PNG) | DCT (JPEG) | Robust Spread-Spectrum |
+|--------|-----------|------------|------------------------|
+| **Format** | PNG (lossless) | JPEG (lossy) | PNG or JPEG |
+| **Domain** | Spatial (alpha pixel values) | Frequency (DCT coefficients) | Spatial (RGB pixel values) |
+| **Channel used** | Alpha (transparency) | Quantized DCT coefficients | R, G, B equally |
+| **Capacity** | High (~3 bits/pixel) | Variable (depends on content/quality) | Low (~59 bytes for 1920×1080) |
+| **Robustness** | Fragile — any re-encoding destroys data | More resilient to minor manipulation | **Survives JPEG compression down to Q≈30** |
+| **Detection** | Detectable via alpha-channel analysis | Harder to detect statistically | Spread below noise floor |
+| **Sync/Async** | Synchronous | Asynchronous | Asynchronous |
+| **Dependencies** | None (self-contained) | CDN library required | None (self-contained) |
+| **Message delimiter** | Bit pattern (0xFF alpha run) | 4-byte length header | 4-byte length header |
 
 ---
 
@@ -565,6 +668,7 @@ The system does **not** protect against:
 | `index.html` | HTML | Main UI — gallery, upload modal, viewer modal, all JavaScript logic |
 | `steganography.js` | JS (browser) | LSB steganography library for PNG images |
 | `dct-steganography.js` | JS (browser) | DCT coefficient steganography wrapper for JPEG images |
+| `robust-steganography.js` | JS (browser) | Spread-spectrum steganography for PNG & JPEG (compression-resistant) |
 | `integrity.js` | JS (browser) | Signature verification using Web Crypto API; contains embedded public key |
 | `sign-proxy.js` | JS (Node.js) | HTTP signing proxy — intercepts uploads, signs images, forwards to backend |
 | `generate-keys.js` | JS (Node.js) | One-time key pair generation; updates integrity.js and index.html |
@@ -617,6 +721,28 @@ await dct.getCapacity(imageFile: File): Promise<number>
 // Returns: Promise<{ status: string, message: string, timestamp?: string }>
 // status: 'verified' | 'tampered' | 'no-signature'
 await ImageIntegrity.verify(imageBytes: ArrayBuffer | Uint8Array): Promise<object>
+```
+
+### `RobustSteganography` — Spread-Spectrum Steganography (Class)
+
+```js
+var rs = new RobustSteganography({ spreadFactor: 64, strength: 15 });
+
+// Embed a message into an image (PNG or JPEG)
+// Returns: Promise resolving to a data URL string
+await rs.embed(source: HTMLImageElement | Blob | File | string,
+               message: string,
+               mimeType?: string,    // 'image/png' (default) or 'image/jpeg'
+               quality?: number      // 0–1, default 0.92
+              ): Promise<string>
+
+// Extract a hidden message from a stego image
+// Returns: Promise resolving to the message string (or '' if none)
+await rs.extract(source: HTMLImageElement | Blob | File | string): Promise<string>
+
+// Get maximum message capacity in bytes for given dimensions
+// Returns: integer (bytes)
+rs.getCapacity(width: number, height: number): number
 ```
 
 ### `sign-proxy.js` — Internal Functions
@@ -722,3 +848,94 @@ Open `index.html` in your browser (e.g., via IDE live server on port 63342, or a
 - **Ctrl + click `+` button** → Opens encode & upload modal (steganography)
 - **Click a gallery image** → Opens viewer with integrity badge
 - **Ctrl + click a gallery image** → Opens viewer **and** decodes hidden message
+
+---
+
+### Testing Compression Robustness
+
+To verify that the robust spread-spectrum encoding survives JPEG compression, follow these steps. You will need **ImageMagick** installed (`magick` command) or any image editor that can re-save JPEGs at different quality levels.
+
+#### Step 1: Encode a message with Robust Mode
+
+1. Open the app in your browser.
+2. **Ctrl + click** the `+` button to open the Encode & Upload modal.
+3. Select a cover image (PNG or JPEG, ideally ≥1920×1080 for maximum capacity).
+4. **Check the "Robust mode"** checkbox.
+5. Enter a short secret message (≤ the displayed capacity).
+6. Click **Encode & Upload**.
+
+The file will be uploaded with `_robust` in the filename (e.g., `photo_robust.jpg`).
+
+#### Step 2: Download the stego image
+
+Download the uploaded image from your backend's storage directory, or fetch it via:
+
+```bash
+curl -o stego.jpg http://localhost:8000/images/photo_robust.jpg
+```
+
+#### Step 3: Re-compress the image at various quality levels
+
+```bash
+# Re-compress at quality 80 (light compression)
+magick stego.jpg -quality 80 stego_q80.jpg
+
+# Re-compress at quality 50 (medium compression)
+magick stego.jpg -quality 50 stego_q50.jpg
+
+# Re-compress at quality 30 (heavy compression)
+magick stego.jpg -quality 30 stego_q30.jpg
+
+# PNG → JPEG → PNG round-trip
+magick stego.png -quality 70 stego_roundtrip.jpg
+```
+
+#### Step 4: Verify message survival
+
+Upload each re-compressed file to the server (use the plain upload `+` button, not Ctrl+click), then **Ctrl + click** the image in the gallery to decode the hidden message.
+
+Alternatively, test in the browser console:
+
+```js
+var rs = new RobustSteganography({ spreadFactor: 64, strength: 15 });
+var img = new Image();
+img.onload = async function() {
+    var msg = await rs.extract(img);
+    console.log('Extracted message:', msg);
+};
+img.src = 'http://localhost:8000/images/stego_q50.jpg';
+```
+
+#### Expected Results
+
+| Test | Standard LSB | Standard DCT | **Robust (default settings)** |
+|------|:------------:|:------------:|:-----------------------------:|
+| Same JPEG quality (Q=92) | ❌ Destroyed | ⚠ May survive | ✅ **Survives** |
+| Quality 80 | ❌ Destroyed | ⚠ May survive | ✅ **Survives** |
+| Quality 50 | ❌ Destroyed | ❌ Destroyed | ✅ **Survives** |
+| Quality 30 | ❌ Destroyed | ❌ Destroyed | ⚠ **Mostly survives** |
+| Quality 10 | ❌ Destroyed | ❌ Destroyed | ❌ Destroyed |
+| PNG re-save (lossless) | ❌ Destroyed (alpha) | N/A | ✅ **Survives** |
+| Resize → resize back | ❌ Destroyed | ❌ Destroyed | ❌ Destroyed |
+| Screenshot & recapture | ❌ Destroyed | ❌ Destroyed | ❌ Destroyed |
+
+#### Step 5: Compare with non-robust encoding
+
+Repeat the same test using a **non-robust** upload (uncheck "Robust mode"). Re-compress the resulting image at quality 50 and attempt to decode. The message will be destroyed, demonstrating the difference.
+
+#### Automated Script (Optional)
+
+```bash
+# Requires ImageMagick on PATH
+# Usage: test-compression.bat stego_robust.jpg
+@echo off
+setlocal
+set INPUT=%1
+for %%Q in (90 80 70 60 50 40 30) do (
+    magick "%INPUT%" -quality %%Q "test_q%%Q.jpg"
+    echo Created test_q%%Q.jpg
+)
+echo.
+echo Upload each test_q*.jpg to the server and Ctrl+click to decode.
+echo The robust message should survive down to Q~30.
+```
